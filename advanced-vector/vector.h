@@ -10,106 +10,104 @@
 #include <utility>
 
 template <typename T>
-// Класс RawMemory ============================================
-    class RawMemory {
-    public:
-    RawMemory() noexcept = default;
-    explicit RawMemory(size_t capacity) : buffer_(Allocate(capacity)), capacity_(capacity) {}
+class RawMemory {
+public:
+RawMemory() noexcept = default;
+explicit RawMemory(size_t capacity) : buffer_(Allocate(capacity)), capacity_(capacity) {}
 
-    RawMemory(const RawMemory&) = delete;
-    RawMemory& operator=(const RawMemory&) = delete;
+RawMemory(const RawMemory&) = delete;
+RawMemory& operator=(const RawMemory&) = delete;
 
-    RawMemory(RawMemory&& other) noexcept {
+RawMemory(RawMemory&& other) noexcept {
+    buffer_ = other.buffer_;
+    capacity_ = other.capacity_;
+    other.buffer_ = nullptr;
+    other.capacity_ = 0;
+}
+
+RawMemory& operator=(RawMemory&& other) noexcept {
+    if (this != &other) {
+        Deallocate(buffer_);
+
         buffer_ = other.buffer_;
         capacity_ = other.capacity_;
+
         other.buffer_ = nullptr;
         other.capacity_ = 0;
     }
 
-    RawMemory& operator=(RawMemory&& other) noexcept {
-        if (this != &other) {
-            Deallocate(buffer_);
+    return *this;
+}
 
-            buffer_ = other.buffer_;
-            capacity_ = other.capacity_;
+~RawMemory() {
+    Deallocate(buffer_);
+}
 
-            other.buffer_ = nullptr;
-            other.capacity_ = 0;
-        }
+T* GetAddress() noexcept {
+    return buffer_;
+}
 
-        return *this;
+const T* GetAddress() const noexcept {
+    return buffer_;
+}
+
+size_t Capacity() const noexcept {
+    return capacity_;
+}
+
+T& operator[](size_t index) noexcept {
+    return *(buffer_ + index);
+}
+
+const T& operator[](size_t index) const noexcept {
+    return *(buffer_ + index);
+}
+
+T* operator+(size_t offset) noexcept {
+    return  buffer_ + offset;
+}
+
+const T* operator+(size_t offset) const noexcept {
+    return buffer_ + offset;
+}
+
+T* begin() noexcept {
+    return buffer_;
+}
+
+const T* begin() const noexcept {
+    return buffer_;
+}
+
+T* end() noexcept {
+    return buffer_ + capacity_;
+}
+
+const T* end() const noexcept {
+    return buffer_ + capacity_;
+}
+
+void Swap(RawMemory& other) noexcept {
+    std::swap(capacity_, other.capacity_);
+    std::swap(buffer_, other.buffer_);
+}
+
+private:
+
+static T* Allocate(size_t count) {
+    return (count > 0) ? static_cast<T*>(operator new(sizeof(T) * count)) : nullptr;
+}
+
+static void Deallocate(T* buffer) noexcept {
+    if (buffer) {
+        operator delete(buffer);
     }
+}
 
-    ~RawMemory() {
-        Deallocate(buffer_);
-    }
+T* buffer_ = nullptr;
+size_t capacity_ = 0;
+};
 
-    T* GetAddress() noexcept {
-        return buffer_;
-    }
-
-    const T* GetAddress() const noexcept {
-        return buffer_;
-    }
-
-    size_t Capacity() const noexcept {
-        return capacity_;
-    }
-
-    T& operator[](size_t index) noexcept {
-        return *(buffer_ + index);
-    }
-
-    const T& operator[](size_t index) const noexcept {
-        return *(buffer_ + index);
-    }
-
-    T* operator+(size_t offset) noexcept {
-        return  buffer_ + offset;
-    }
-
-    const T* operator+(size_t offset) const noexcept {
-        return buffer_ + offset;
-    }
-
-    T* begin() noexcept {
-        return buffer_;
-    }
-
-    const T* begin() const noexcept {
-        return buffer_;
-    }
-
-    T* end() noexcept {
-        return buffer_ + capacity_;
-    }
-
-    const T* end() const noexcept {
-        return buffer_ + capacity_;
-    }
-
-    void Swap(RawMemory& other) noexcept {
-        std::swap(capacity_, other.capacity_);
-        std::swap(buffer_, other.buffer_);
-    }
-
-    private:
-
-    static T* Allocate(size_t count) {
-        return (count > 0) ? static_cast<T*>(operator new(sizeof(T) * count)) : nullptr;
-    }
-
-    static void Deallocate(T* buffer) noexcept {
-        if (buffer) {
-            operator delete(buffer);
-        }
-    }
-
-    private:
-    T* buffer_ = nullptr;
-    size_t capacity_ = 0;
-    };
-//====================================================================
 
 template <typename T>
 class Vector {
@@ -529,8 +527,6 @@ public:
 
         return begin() + index;
     }
-
-
 
 private:
     RawMemory<T> data_;
