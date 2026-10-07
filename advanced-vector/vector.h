@@ -10,7 +10,7 @@
 #include <utility>
 
 template <typename T>
-class RawMemory {
+class RawMemory { // RawMemory
 public:
     RawMemory() noexcept = default;
     explicit RawMemory(size_t capacity) : buffer_(Allocate(capacity)), capacity_(capacity) {}
