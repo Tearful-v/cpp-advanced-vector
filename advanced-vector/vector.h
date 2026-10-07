@@ -217,71 +217,17 @@ public:
         --size_;
     }
 
-    template <typename D> // общий для r-value и l-value
-    void PushBack(D&& value) { //предоставляет strong гарантию
-        if (Size() < Capacity()) {
-            std::construct_at(
-                data_.GetAddress() + Size(),
-                std::forward<D>(value)
-            );
-            ++size_;
-            return;
-        }
+    void PushBack(const T& value) {
+        EmplaceBack(value);
+    }
 
-        RawMemory<T> tmp((Size() == 0) ? 1 : Size() * 2);
-        std::construct_at(
-            tmp.GetAddress() + Size(),
-            std::forward<D>(value)
-        );
-
-        try {
-            UninitializedMoveOrCopy(
-                data_.GetAddress(),
-                Size(),
-                tmp.GetAddress()
-            );
-        } catch (...) {
-            std::destroy_at(tmp.GetAddress() + Size());
-            throw;
-        }
-
-        Destroy(data_.GetAddress(), Size());
-        data_.Swap(tmp);
-        ++size_;
+    void PushBack(T&& value) {
+        EmplaceBack(std::move(value));
     }
 
     template <typename... Args>
     T& EmplaceBack(Args&&... args) {
-        if (Size() < Capacity()) {
-            std::construct_at(
-                data_.GetAddress() + Size(),
-                std::forward<Args>(args)...
-            );
-            ++size_;
-            return data_[size_ - 1];
-        }
-
-        RawMemory<T> tmp((Size() == 0) ? 1 : Size() * 2);
-        std::construct_at(
-            tmp.GetAddress() + Size(),
-            std::forward<Args>(args)...
-        );
-
-        try {
-            UninitializedMoveOrCopy(
-                data_.GetAddress(),
-                Size(),
-                tmp.GetAddress()
-            );
-        } catch (...) {
-            std::destroy_at(tmp.GetAddress() + Size());
-            throw;
-        }
-
-        Destroy(data_.GetAddress(), Size());
-        data_.Swap(tmp);
-        ++size_;
-        return data_[size_ - 1];
+        return *Emplace(end(), std::forward<Args>(args)...);
     }
 
     using iterator = T*;
@@ -312,24 +258,25 @@ public:
     }
 
     iterator Insert(const_iterator pos, const T& value) {
-        return InsertImpl(pos, value);
+        return Emplace(pos, value);
     }
 
     iterator Insert(const_iterator pos, T&& value) {
-        return InsertImpl(pos, std::move(value));
+        return Emplace(pos, std::move(value));
     }
 
     template <typename... Args>
     iterator Emplace(const_iterator pos, Args&&... args) {
-        const size_t index = pos - begin();
+        assert(pos >= begin() && pos <= end());
+        const size_t index = Empty() ? 0 : pos - begin();
         if (Size() < Capacity()) {
-            T tmp(std::forward<Args>(args)...);
             if (index == Size()) {
                 std::construct_at(
                     data_.GetAddress() + Size(),
-                    std::move(tmp)
+                    std::forward<Args>(args)...
                 );
             } else {
+                T tmp(std::forward<Args>(args)...);
                 std::construct_at(
                     data_.GetAddress() + Size(),
                     std::move(data_[Size() - 1])
@@ -360,17 +307,21 @@ public:
 
         bool left_constructed = false;
         try {
-            UninitializedMoveOrCopy(
-                data_.GetAddress(),
-                index,
-                tmp.GetAddress()
-            );
-            left_constructed = true;
-            UninitializedMoveOrCopy(
-                data_.GetAddress() + index,
-                Size() - index,
-                tmp.GetAddress() + index + 1
-            );
+            if (index > 0) {
+                UninitializedMoveOrCopy(
+                    data_.GetAddress(),
+                    index,
+                    tmp.GetAddress()
+                );
+                left_constructed = true;
+            }
+            if (index < Size()) {
+                UninitializedMoveOrCopy(
+                    data_.GetAddress() + index,
+                    Size() - index,
+                    tmp.GetAddress() + index + 1
+                );
+            }
         } catch (...) {
             if (left_constructed) {
                 std::destroy_n(
@@ -393,6 +344,7 @@ public:
     }
 
     iterator Erase(const_iterator pos) {
+        assert(pos >= begin() && pos < end());
         const size_t index = pos - cbegin();
 
         std::move(
@@ -412,7 +364,6 @@ private:
         std::destroy_n(ptr, count);
     }
 
-    //надобность в этой функции появилась из-за желания написать общий PushBack для l и r - value
     static void UninitializedMoveOrCopy(T* from, size_t count, T* to) {
         if constexpr (
             std::is_nothrow_move_constructible_v<T>
@@ -422,71 +373,6 @@ private:
         } else {
             std::uninitialized_copy_n(from, count, to);
         }
-    }
-
-    template <typename U>
-    iterator InsertImpl(const_iterator pos, U&& value) {
-        const size_t index = pos - begin();
-        if (Size() < Capacity()) {
-            T tmp(std::forward<U>(value));
-            if (index == Size()) {
-                new (data_.GetAddress() + Size()) T(std::move(tmp));
-            } else {
-                new (data_.GetAddress() + Size())
-                    T(std::move(data_[Size() - 1]));
-
-                try {
-                    std::move_backward(
-                        data_.GetAddress() + index,
-                        data_.GetAddress() + Size() - 1,
-                        data_.GetAddress() + Size()
-                    );
-                    data_[index] = std::move(tmp);
-                } catch (...) {
-                    std::destroy_at(data_.GetAddress() + Size());
-                    throw;
-                }
-            }
-            ++size_;
-            return begin() + index;
-        }
-
-        RawMemory<T> tmp((Size() == 0) ? 1 : Size() * 2);
-        new (tmp.GetAddress() + index)
-            T(std::forward<U>(value));
-        bool left_constructed = false;
-
-        try {
-            UninitializedMoveOrCopy(
-                data_.GetAddress(),
-                index,
-                tmp.GetAddress()
-            );
-            left_constructed = true;
-
-            UninitializedMoveOrCopy(
-                data_.GetAddress() + index,
-                Size() - index,
-                tmp.GetAddress() + index + 1
-            );
-        } catch (...) {
-            if (left_constructed) {
-                std::destroy_n(
-                    tmp.GetAddress(),
-                    index
-                );
-            }
-
-            std::destroy_at(
-                tmp.GetAddress() + index
-            );
-            throw;
-        }
-
-        Destroy(data_.GetAddress(), Size());
-        data_.Swap(tmp);
-        ++size_;
-        return begin() + index;
     }
 
     RawMemory<T> data_;
