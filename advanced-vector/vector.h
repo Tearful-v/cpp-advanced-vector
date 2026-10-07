@@ -87,14 +87,12 @@ public:
     Vector() noexcept = default;
 
     explicit Vector(size_t elem_count)
-        : data_(elem_count) {
-
+        : data_(elem_count)
+        , size_(elem_count) {
         std::uninitialized_value_construct_n(
             data_.GetAddress(),
             elem_count
         );
-
-        size_ = elem_count;
     }
 
     Vector(Vector&& other) noexcept {
@@ -103,15 +101,13 @@ public:
     }
 
     Vector(const Vector& other)
-        : data_(other.size_) {
-
+        : data_(other.size_)
+        , size_(other.size_) {
         std::uninitialized_copy_n(
             other.data_.GetAddress(),
             other.size_,
             data_.GetAddress()
         );
-
-        size_ = other.size_;
     }
 
     ~Vector() {
@@ -163,25 +159,21 @@ public:
             if (other.Size() > Capacity()) {
                 Vector<T> tmp(other);
                 Swap(tmp);
-            } else if (other.Size() <= Capacity() && other.Size() > Size()) {
-
-                std::copy(other.data_.GetAddress(),
-                    other.data_.GetAddress() + Size(),
-                    data_.GetAddress());
-
-                std::uninitialized_copy(
-                    other.data_.GetAddress() + Size(),
-                    other.data_.GetAddress() + other.Size(),
-                    data_.GetAddress() + Size());
-
-                size_ = other.size_;
             } else {
-                std::copy(other.data_.GetAddress(),
-                    other.data_.GetAddress() + other.Size(),
+                std::copy_n(other.data_.GetAddress(),
+                    std::min(Size(), other.Size()),
                     data_.GetAddress());
 
-                Destroy(data_.GetAddress() + other.Size(),
-                    Size() - other.Size());
+                if (other.Size() < Size()) {
+                    std::destroy_n(data_.GetAddress() + other.Size(),
+                        Size() - other.Size());
+                } else if (other.Size() > Size()) {
+                    std::uninitialized_copy_n(
+                        other.data_.GetAddress() + Size(),
+                        other.Size() - Size(),
+                        data_.GetAddress() + Size());
+                }
+
                 size_ = other.Size();
             }
         }
@@ -214,7 +206,7 @@ public:
         size_ = new_size;
     }
 
-    bool Empty() {
+    bool Empty() const noexcept {
         return Size() == 0;
     }
 
