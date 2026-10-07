@@ -12,72 +12,72 @@
 template <typename T>
 class RawMemory {
 public:
-RawMemory() noexcept = default;
-explicit RawMemory(size_t capacity) : buffer_(Allocate(capacity)), capacity_(capacity) {}
+    RawMemory() noexcept = default;
+    explicit RawMemory(size_t capacity) : buffer_(Allocate(capacity)), capacity_(capacity) {}
 
-RawMemory(const RawMemory&) = delete;
-RawMemory& operator=(const RawMemory&) = delete;
+    RawMemory(const RawMemory&) = delete;
+    RawMemory& operator=(const RawMemory&) = delete;
 
-RawMemory(RawMemory&& other) noexcept {
-    Swap(other);
-}
+    RawMemory(RawMemory&& other) noexcept {
+        Swap(other);
+    }
 
-RawMemory& operator=(RawMemory&& other) noexcept {
-    Swap(other);
-    return *this;
-}
+    RawMemory& operator=(RawMemory&& other) noexcept {
+        Swap(other);
+        return *this;
+    }
 
-~RawMemory() {
-    Deallocate(buffer_);
-}
+    ~RawMemory() {
+        Deallocate(buffer_);
+    }
 
-T* GetAddress() noexcept {
-    return buffer_;
-}
+    T* GetAddress() noexcept {
+        return buffer_;
+    }
 
-const T* GetAddress() const noexcept {
-    return buffer_;
-}
+    const T* GetAddress() const noexcept {
+        return buffer_;
+    }
 
-size_t Capacity() const noexcept {
-    return capacity_;
-}
+    size_t Capacity() const noexcept {
+        return capacity_;
+    }
 
-T& operator[](size_t index) noexcept {
-    return *(buffer_ + index);
-}
+    T& operator[](size_t index) noexcept {
+        return *(buffer_ + index);
+    }
 
-const T& operator[](size_t index) const noexcept {
-    return *(buffer_ + index);
-}
+    const T& operator[](size_t index) const noexcept {
+        return *(buffer_ + index);
+    }
 
-T* operator+(size_t offset) noexcept {
-    return  buffer_ + offset;
-}
+    T* operator+(size_t offset) noexcept {
+        return  buffer_ + offset;
+    }
 
-const T* operator+(size_t offset) const noexcept {
-    return buffer_ + offset;
-}
+    const T* operator+(size_t offset) const noexcept {
+        return buffer_ + offset;
+    }
 
-void Swap(RawMemory& other) noexcept {
-    std::swap(capacity_, other.capacity_);
-    std::swap(buffer_, other.buffer_);
-}
+    void Swap(RawMemory& other) noexcept {
+        std::swap(capacity_, other.capacity_);
+        std::swap(buffer_, other.buffer_);
+    }
 
 private:
 
-static T* Allocate(size_t count) {
-    return (count > 0) ? static_cast<T*>(operator new(sizeof(T) * count)) : nullptr;
-}
-
-static void Deallocate(T* buffer) noexcept {
-    if (buffer) {
-        operator delete(buffer);
+    static T* Allocate(size_t count) {
+        return (count > 0) ? static_cast<T*>(operator new(sizeof(T) * count)) : nullptr;
     }
-}
 
-T* buffer_ = nullptr;
-size_t capacity_ = 0;
+    static void Deallocate(T* buffer) noexcept {
+        if (buffer) {
+            operator delete(buffer);
+        }
+    }
+
+    T* buffer_ = nullptr;
+    size_t capacity_ = 0;
 };
 
 
