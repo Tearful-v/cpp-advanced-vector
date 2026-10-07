@@ -268,7 +268,7 @@ public:
     template <typename... Args>
     iterator Emplace(const_iterator pos, Args&&... args) {
         assert(pos >= begin() && pos <= end());
-        const size_t index = Empty() ? 0 : pos - begin();
+        const size_t index = pos - begin();
         if (Size() < Capacity()) {
             if (index == Size()) {
                 std::construct_at(
@@ -307,21 +307,17 @@ public:
 
         bool left_constructed = false;
         try {
-            if (index > 0) {
-                UninitializedMoveOrCopy(
-                    data_.GetAddress(),
-                    index,
-                    tmp.GetAddress()
-                );
-                left_constructed = true;
-            }
-            if (index < Size()) {
-                UninitializedMoveOrCopy(
-                    data_.GetAddress() + index,
-                    Size() - index,
-                    tmp.GetAddress() + index + 1
-                );
-            }
+            UninitializedMoveOrCopy(
+                data_.GetAddress(),
+                index,
+                tmp.GetAddress()
+            );
+            left_constructed = true;
+            UninitializedMoveOrCopy(
+                data_.GetAddress() + index,
+                Size() - index,
+                tmp.GetAddress() + index + 1
+            );
         } catch (...) {
             if (left_constructed) {
                 std::destroy_n(
