@@ -11,73 +11,73 @@
 
 template <typename T>
 class RawMemory {
-public:
-RawMemory() noexcept = default;
-explicit RawMemory(size_t capacity) : buffer_(Allocate(capacity)), capacity_(capacity) {}
+    public:
+    RawMemory() noexcept = default;
+    explicit RawMemory(size_t capacity) : buffer_(Allocate(capacity)), capacity_(capacity) {}
 
-RawMemory(const RawMemory&) = delete;
-RawMemory& operator=(const RawMemory&) = delete;
+    RawMemory(const RawMemory&) = delete;
+    RawMemory& operator=(const RawMemory&) = delete;
 
-RawMemory(RawMemory&& other) noexcept {
-    Swap(other);
-}
-
-RawMemory& operator=(RawMemory&& other) noexcept {
-    Swap(other);
-    return *this;
-}
-
-~RawMemory() {
-    Deallocate(buffer_);
-}
-
-T* GetAddress() noexcept {
-    return buffer_;
-}
-
-const T* GetAddress() const noexcept {
-    return buffer_;
-}
-
-size_t Capacity() const noexcept {
-    return capacity_;
-}
-
-T& operator[](size_t index) noexcept {
-    return *(buffer_ + index);
-}
-
-const T& operator[](size_t index) const noexcept {
-    return *(buffer_ + index);
-}
-
-T* operator+(size_t offset) noexcept {
-    return  buffer_ + offset;
-}
-
-const T* operator+(size_t offset) const noexcept {
-    return buffer_ + offset;
-}
-
-void Swap(RawMemory& other) noexcept {
-    std::swap(capacity_, other.capacity_);
-    std::swap(buffer_, other.buffer_);
-}
-
-private:
-
-static T* Allocate(size_t count) {
-    return (count > 0) ? static_cast<T*>(operator new(sizeof(T) * count)) : nullptr;
-}
-
-static void Deallocate(T* buffer) noexcept {
-    if (buffer) {
-        operator delete(buffer);
+    RawMemory(RawMemory&& other) noexcept {
+        Swap(other);
     }
-}
 
-T* buffer_ = nullptr;
-size_t capacity_ = 0;
+    RawMemory& operator=(RawMemory&& other) noexcept {
+        Swap(other);
+        return *this;
+    }
+
+    ~RawMemory() {
+        Deallocate(buffer_);
+    }
+
+    T* GetAddress() noexcept {
+        return buffer_;
+    }
+
+    const T* GetAddress() const noexcept {
+        return buffer_;
+    }
+
+    size_t Capacity() const noexcept {
+        return capacity_;
+    }
+
+    T& operator[](size_t index) noexcept {
+        return *(buffer_ + index);
+    }
+
+    const T& operator[](size_t index) const noexcept {
+        return *(buffer_ + index);
+    }
+
+    T* operator+(size_t offset) noexcept {
+        return  buffer_ + offset;
+    }
+
+    const T* operator+(size_t offset) const noexcept {
+        return buffer_ + offset;
+    }
+
+    void Swap(RawMemory& other) noexcept {
+        std::swap(capacity_, other.capacity_);
+        std::swap(buffer_, other.buffer_);
+    }
+
+    private:
+
+    static T* Allocate(size_t count) {
+        return (count > 0) ? static_cast<T*>(operator new(sizeof(T) * count)) : nullptr;
+    }
+
+    static void Deallocate(T* buffer) noexcept {
+        if (buffer) {
+            operator delete(buffer);
+        }
+    }
+
+    T* buffer_ = nullptr;
+    size_t capacity_ = 0;
 };
 
 
@@ -268,7 +268,7 @@ public:
     template <typename... Args>
     iterator Emplace(const_iterator pos, Args&&... args) {
         assert(pos >= begin() && pos <= end());
-        const size_t index = pos - begin();
+        const size_t index = Empty() ? 0 : pos - begin();
         if (Size() < Capacity()) {
             if (index == Size()) {
                 std::construct_at(
@@ -307,17 +307,21 @@ public:
 
         bool left_constructed = false;
         try {
-            UninitializedMoveOrCopy(
-                data_.GetAddress(),
-                index,
-                tmp.GetAddress()
-            );
-            left_constructed = true;
-            UninitializedMoveOrCopy(
-                data_.GetAddress() + index,
-                Size() - index,
-                tmp.GetAddress() + index + 1
-            );
+            if (index > 0) {
+                UninitializedMoveOrCopy(
+                    data_.GetAddress(),
+                    index,
+                    tmp.GetAddress()
+                );
+                left_constructed = true;
+            }
+            if (index < Size()) {
+                UninitializedMoveOrCopy(
+                    data_.GetAddress() + index,
+                    Size() - index,
+                    tmp.GetAddress() + index + 1
+                );
+            }
         } catch (...) {
             if (left_constructed) {
                 std::destroy_n(
