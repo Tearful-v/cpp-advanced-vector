@@ -19,23 +19,11 @@ RawMemory(const RawMemory&) = delete;
 RawMemory& operator=(const RawMemory&) = delete;
 
 RawMemory(RawMemory&& other) noexcept {
-    buffer_ = other.buffer_;
-    capacity_ = other.capacity_;
-    other.buffer_ = nullptr;
-    other.capacity_ = 0;
+    Swap(other);
 }
 
 RawMemory& operator=(RawMemory&& other) noexcept {
-    if (this != &other) {
-        Deallocate(buffer_);
-
-        buffer_ = other.buffer_;
-        capacity_ = other.capacity_;
-
-        other.buffer_ = nullptr;
-        other.capacity_ = 0;
-    }
-
+    Swap(other);
     return *this;
 }
 
@@ -69,22 +57,6 @@ T* operator+(size_t offset) noexcept {
 
 const T* operator+(size_t offset) const noexcept {
     return buffer_ + offset;
-}
-
-T* begin() noexcept {
-    return buffer_;
-}
-
-const T* begin() const noexcept {
-    return buffer_;
-}
-
-T* end() noexcept {
-    return buffer_ + capacity_;
-}
-
-const T* end() const noexcept {
-    return buffer_ + capacity_;
 }
 
 void Swap(RawMemory& other) noexcept {
@@ -213,19 +185,19 @@ public:
                 Swap(tmp);
             } else if (other.Size() <= Capacity() && other.Size() > Size()) {
 
-                std::copy(other.data_.begin(),
-                    other.data_.begin() + Size(),
+                std::copy(other.data_.GetAddress(),
+                    other.data_.GetAddress() + Size(),
                     data_.GetAddress());
 
                 std::uninitialized_copy(
-                    other.data_.begin() + Size(),
-                    other.data_.begin() + other.Size(),
-                    data_.begin() + Size());
+                    other.data_.GetAddress() + Size(),
+                    other.data_.GetAddress() + other.Size(),
+                    data_.GetAddress() + Size());
 
                 size_ = other.size_;
             } else {
-                std::copy(other.data_.begin(),
-                    other.data_.begin() + other.Size(),
+                std::copy(other.data_.GetAddress(),
+                    other.data_.GetAddress() + other.Size(),
                     data_.GetAddress());
 
                 Destroy(data_.GetAddress() + other.Size(),
