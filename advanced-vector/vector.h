@@ -84,18 +84,6 @@ size_t capacity_ = 0;
 template <typename T>
 class Vector {
 public:
-    static void Destroy(T* ptr, size_t count) noexcept {
-        std::destroy_n(ptr, count);
-    }
-
-    ~Vector() {
-        Destroy(data_.GetAddress(), size_);
-    }
-
-    size_t GetIndex(const T* start, const T* finish) {
-        return finish - start;
-    }
-
     Vector() noexcept = default;
 
     explicit Vector(size_t elem_count)
@@ -126,16 +114,8 @@ public:
         size_ = other.size_;
     }
 
-    //надобность в этой функции появилась из-за желания написать общий PushBack для l и r - value
-    static void UninitializedMoveOrCopy(T* from, size_t count, T* to) {
-        if constexpr (
-            std::is_nothrow_move_constructible_v<T>
-            || !std::is_copy_constructible_v<T>
-        ) {
-            std::uninitialized_move_n(from, count, to);
-        } else {
-            std::uninitialized_copy_n(from, count, to);
-        }
+    ~Vector() {
+        Destroy(data_.GetAddress(), size_);
     }
 
     void Reserve(size_t capacity) {
@@ -339,71 +319,6 @@ public:
         return data_.GetAddress() + Size();
     }
 
-    template <typename U>
-    iterator InsertImpl(const_iterator pos, U&& value) {
-        const size_t index = GetIndex(data_.GetAddress(), pos);
-        if (Size() < Capacity()) {
-            T tmp(std::forward<U>(value));
-            if (index == Size()) {
-                new (data_.GetAddress() + Size()) T(std::move(tmp));
-            } else {
-                new (data_.GetAddress() + Size())
-                    T(std::move(data_[Size() - 1]));
-
-                try {
-                    std::move_backward(
-                        data_.GetAddress() + index,
-                        data_.GetAddress() + Size() - 1,
-                        data_.GetAddress() + Size()
-                    );
-                    data_[index] = std::move(tmp);
-                } catch (...) {
-                    std::destroy_at(data_.GetAddress() + Size());
-                    throw;
-                }
-            }
-            ++size_;
-            return begin() + index;
-        }
-
-        RawMemory<T> tmp((Size() == 0) ? 1 : Size() * 2);
-        new (tmp.GetAddress() + index)
-            T(std::forward<U>(value));
-        bool left_constructed = false;
-
-        try {
-            UninitializedMoveOrCopy(
-                data_.GetAddress(),
-                index,
-                tmp.GetAddress()
-            );
-            left_constructed = true;
-
-            UninitializedMoveOrCopy(
-                data_.GetAddress() + index,
-                Size() - index,
-                tmp.GetAddress() + index + 1
-            );
-        } catch (...) {
-            if (left_constructed) {
-                std::destroy_n(
-                    tmp.GetAddress(),
-                    index
-                );
-            }
-
-            std::destroy_at(
-                tmp.GetAddress() + index
-            );
-            throw;
-        }
-
-        Destroy(data_.GetAddress(), Size());
-        data_.Swap(tmp);
-        ++size_;
-        return begin() + index;
-    }
-
     iterator Insert(const_iterator pos, const T& value) {
         return InsertImpl(pos, value);
     }
@@ -414,7 +329,7 @@ public:
 
     template <typename... Args>
     iterator Emplace(const_iterator pos, Args&&... args) {
-        const size_t index = GetIndex(data_.GetAddress(), pos);
+        const size_t index = pos - begin();
         if (Size() < Capacity()) {
             T tmp(std::forward<Args>(args)...);
             if (index == Size()) {
@@ -501,6 +416,87 @@ public:
     }
 
 private:
+    static void Destroy(T* ptr, size_t count) noexcept {
+        std::destroy_n(ptr, count);
+    }
+
+    //надобность в этой функции появилась из-за желания написать общий PushBack для l и r - value
+    static void UninitializedMoveOrCopy(T* from, size_t count, T* to) {
+        if constexpr (
+            std::is_nothrow_move_constructible_v<T>
+            || !std::is_copy_constructible_v<T>
+        ) {
+            std::uninitialized_move_n(from, count, to);
+        } else {
+            std::uninitialized_copy_n(from, count, to);
+        }
+    }
+
+    template <typename U>
+    iterator InsertImpl(const_iterator pos, U&& value) {
+        const size_t index = pos - begin();
+        if (Size() < Capacity()) {
+            T tmp(std::forward<U>(value));
+            if (index == Size()) {
+                new (data_.GetAddress() + Size()) T(std::move(tmp));
+            } else {
+                new (data_.GetAddress() + Size())
+                    T(std::move(data_[Size() - 1]));
+
+                try {
+                    std::move_backward(
+                        data_.GetAddress() + index,
+                        data_.GetAddress() + Size() - 1,
+                        data_.GetAddress() + Size()
+                    );
+                    data_[index] = std::move(tmp);
+                } catch (...) {
+                    std::destroy_at(data_.GetAddress() + Size());
+                    throw;
+                }
+            }
+            ++size_;
+            return begin() + index;
+        }
+
+        RawMemory<T> tmp((Size() == 0) ? 1 : Size() * 2);
+        new (tmp.GetAddress() + index)
+            T(std::forward<U>(value));
+        bool left_constructed = false;
+
+        try {
+            UninitializedMoveOrCopy(
+                data_.GetAddress(),
+                index,
+                tmp.GetAddress()
+            );
+            left_constructed = true;
+
+            UninitializedMoveOrCopy(
+                data_.GetAddress() + index,
+                Size() - index,
+                tmp.GetAddress() + index + 1
+            );
+        } catch (...) {
+            if (left_constructed) {
+                std::destroy_n(
+                    tmp.GetAddress(),
+                    index
+                );
+            }
+
+            std::destroy_at(
+                tmp.GetAddress() + index
+            );
+            throw;
+        }
+
+        Destroy(data_.GetAddress(), Size());
+        data_.Swap(tmp);
+        ++size_;
+        return begin() + index;
+    }
+
     RawMemory<T> data_;
     size_t size_ = 0;
 };
